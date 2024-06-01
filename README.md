@@ -1,1 +1,0 @@
-# E-commerce-Inventory-Management
