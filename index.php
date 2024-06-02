@@ -80,6 +80,10 @@ $conn->close();
         <?php else: ?>
             <p>No products available.</p>
         <?php endif; ?>
+        <br>
+
+        <a href="view_orders.php">View Orders</a>
+
     </div>
 </body>
 </html>

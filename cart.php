@@ -25,15 +25,14 @@ if (count($cart) > 0) {
 
     if ($product_result->num_rows > 0) {
         while ($row = $product_result->fetch_assoc()) {
-            $products[] = $row;
+            $products[$row['product_id']] = $row; // Store product details by product_id for easy access
         }
     }
 }
 
 // Function to calculate the discount for a product
-function calculateDiscount($product, $discounts, $quantity)
+function calculateDiscount($product, $discounts, $quantity, &$free_products)
 {
-    $free_products = 0; // Initialize the variable here
     $product_tags = explode(',', $product['tags']);
     foreach ($discounts as $discount) {
         $discount_tags = explode(',', $discount['tags']);
@@ -56,12 +55,19 @@ if (isset($_POST['confirm_order'])) {
     $product_ids = implode(',', array_keys($cart));
     $quantities = implode(',', $cart);
     $prices = [];
-    foreach ($products as $product) {
+    $free_products_array = [];
+
+    foreach ($cart as $product_id => $quantity) {
+        $product = $products[$product_id];
         $prices[] = $product['price'];
+        $free_products = 0;
+        calculateDiscount($product, $discounts, $quantity, $free_products);
+        $free_products_array[] = $free_products;
     }
     $total_price = array_sum($prices);
+    $free_products_string = implode(',', $free_products_array);
 
-    $order_sql = "INSERT INTO Orders (user_id, product_ids, quantities, prices, total_price) VALUES ($user_id, '$product_ids', '$quantities', '" . implode(',', $prices) . "', $total_price)";
+    $order_sql = "INSERT INTO Orders (user_id, product_ids, quantities, prices, total_price, free_products) VALUES ($user_id, '$product_ids', '$quantities', '" . implode(',', $prices) . "', $total_price, '$free_products_string')";
     $conn->query($order_sql);
 
     // Update stock quantities for purchased products
@@ -71,9 +77,9 @@ if (isset($_POST['confirm_order'])) {
         $conn->query($update_sql);
 
         // Handle free products from discounts
-        $product_discounts = calculateDiscount($products[$product_id - 1], $discounts, $quantity);
-        if (strpos($product_discounts, 'free') != false) {
-            $free_products = intval(str_replace('+', '', str_replace(' free', '', $product_discounts)));
+        $free_products = 0;
+        calculateDiscount($products[$product_id], $discounts, $quantity, $free_products);
+        if ($free_products > 0) {
             $update_sql = "UPDATE Products SET stock = stock - $free_products WHERE product_id = $product_id";
             $conn->query($update_sql);
         }
@@ -128,20 +134,19 @@ $conn->close();
                 <tbody>
                     <?php
                     $grand_total = 0;
-                    foreach ($products as $product) {
-                        $product_id = $product['product_id'];
-                        $quantity = $cart[$product_id];
+                    foreach ($cart as $product_id => $quantity) {
+                        $product = $products[$product_id];
                         $price = $product['price'];
                         $total = $price * $quantity;
-                        $discount = calculateDiscount($product, $discounts, $quantity);
+                        $free_products = 0;
+                        $discount = calculateDiscount($product, $discounts, $quantity, $free_products);
                         $discounted_total = $total;
 
                         if (strpos($discount, '%') !== false) {
                             $percentage = floatval(str_replace('-', '', str_replace('%', '', $discount)));
                             $discounted_total = $total - ($total * ($percentage / 100));
                         } elseif (strpos($discount, 'free') !== false) {
-                            $free_products = intval(str_replace('+', '', str_replace(' free', '', $discount)));
-                            $discounted_total -= $free_products * $price; // Deduct the value of free products from the total
+                            $discounted_total = $total; // Subtract the value of free products from the total
                         }
 
                         $grand_total += $discounted_total;
