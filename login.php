@@ -6,13 +6,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = $_POST['email'];
     $password = $_POST['password'];
 
-    $sql = "SELECT user_id, password, is_admin FROM Users WHERE email='$email'";
+    $sql = "SELECT user_id, name,password, is_admin FROM Users WHERE email='$email'";
     $result = $conn->query($sql);
     if ($result->num_rows > 0) {
         $row = $result->fetch_assoc();
         if (password_verify($password, $row['password'])) {
             $_SESSION['user_id'] = $row['user_id'];
             $_SESSION['is_admin'] = $row['is_admin'];
+            $_SESSION['name'] = $row['name'];
             header("location: index.php");
         } else {
             echo "Invalid password.";

@@ -42,3 +42,15 @@ CREATE TABLE Stock_Adjustments (
     quantity INT NOT NULL,
     adjustment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+
+CREATE TABLE Discounts (
+    discount_id INT AUTO_INCREMENT PRIMARY KEY,
+    discount_name VARCHAR(100) NOT NULL,
+    discount_type ENUM('percentage', 'buy_n_get_m') NOT NULL,
+    discount_value DECIMAL(5, 2) NOT NULL,
+    buy_quantity INT,  -- Only applicable for "buy n get m" discounts
+    tags VARCHAR(255),  -- Comma-separated list of tags for products eligible for the discount
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL
+);

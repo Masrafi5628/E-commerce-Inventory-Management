@@ -1,1 +1,5 @@
-    $passs = password_hash('admin', PASSWORD_DEFAULT);
+$passs = password_hash('admin', PASSWORD_DEFAULT);
+
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
