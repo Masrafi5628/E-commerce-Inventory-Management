@@ -2,22 +2,6 @@
 session_start();
 include('config.php');
 
-// Function to calculate the discount for a product
-function calculateDiscount($product, $discounts, $quantity) {
-    $product_tags = explode(',', $product['tags']);
-    foreach ($discounts as $discount) {
-        $discount_tags = explode(',', $discount['tags']);
-        if (array_intersect($product_tags, $discount_tags)) {
-            if ($discount['discount_type'] == 'percentage') {
-                return '-' . $discount['discount_value'] . '%';
-            } elseif ($discount['discount_type'] == 'buy_n_get_m' && $quantity >= $discount['buy_quantity']) {
-                return '+' . $discount['discount_value'] . ' free';
-            }
-        }
-    }
-    return '';
-}
-
 // Fetch discounts from the database
 $discount_sql = "SELECT * FROM Discounts WHERE start_date <= CURDATE() AND end_date >= CURDATE()";
 $discount_result = $conn->query($discount_sql);
@@ -44,7 +28,63 @@ if (count($cart) > 0) {
             $products[] = $row;
         }
     }
-} 
+}
+
+// Function to calculate the discount for a product
+function calculateDiscount($product, $discounts, $quantity)
+{
+    $free_products = 0; // Initialize the variable here
+    $product_tags = explode(',', $product['tags']);
+    foreach ($discounts as $discount) {
+        $discount_tags = explode(',', $discount['tags']);
+        if (array_intersect($product_tags, $discount_tags)) {
+            if ($discount['discount_type'] == 'percentage') {
+                return '-' . $discount['discount_value'] . '%';
+            } elseif ($discount['discount_type'] == 'buy_n_get_m' && $quantity >= $discount['buy_quantity']) {
+                $free_products = floor($quantity / $discount['buy_quantity']) * $discount['discount_value'];
+                return '+' . $free_products . ' free';
+            }
+        }
+    }
+    return '';
+}
+
+// Handle order confirmation
+if (isset($_POST['confirm_order'])) {
+    // Store order information in the database
+    $user_id = $_SESSION['user_id']; // Assuming you have a user session
+    $product_ids = implode(',', array_keys($cart));
+    $quantities = implode(',', $cart);
+    $prices = [];
+    foreach ($products as $product) {
+        $prices[] = $product['price'];
+    }
+    $total_price = array_sum($prices);
+
+    $order_sql = "INSERT INTO Orders (user_id, product_ids, quantities, prices, total_price) VALUES ($user_id, '$product_ids', '$quantities', '" . implode(',', $prices) . "', $total_price)";
+    $conn->query($order_sql);
+
+    // Update stock quantities for purchased products
+    foreach ($cart as $product_id => $quantity) {
+        // Subtract purchased quantity from stock
+        $update_sql = "UPDATE Products SET stock = stock - $quantity WHERE product_id = $product_id";
+        $conn->query($update_sql);
+
+        // Handle free products from discounts
+        $product_discounts = calculateDiscount($products[$product_id - 1], $discounts, $quantity);
+        if (strpos($product_discounts, 'free') != false) {
+            $free_products = intval(str_replace('+', '', str_replace(' free', '', $product_discounts)));
+            $update_sql = "UPDATE Products SET stock = stock - $free_products WHERE product_id = $product_id";
+            $conn->query($update_sql);
+        }
+    }
+
+    // Clear the cart after confirming the order
+    unset($_SESSION['cart']);
+    // Redirect to a thank you page or order history
+    header('Location: index.php');
+    exit();
+}
 
 $conn->close();
 ?>
@@ -74,51 +114,58 @@ $conn->close();
     <?php if (empty($cart)): ?>
         <p>Your cart is empty.</p>
     <?php else: ?>
-        <table>
-            <thead>
-                <tr>
-                    <th>Product Name</th>
-                    <th>Quantity</th>
-                    <th>Price (৳)</th>
-                    <th>Discount</th>
-                    <th>Total (৳)</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                $grand_total = 0;
-                foreach ($products as $product) {
-                    $product_id = $product['product_id'];
-                    $quantity = $cart[$product_id];
-                    $price = $product['price'];
-                    $total = $price * $quantity;
-                    $discount = calculateDiscount($product, $discounts, $quantity);
-                    $discounted_total = $total;
+        <form method="post">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Product Name</th>
+                        <th>Quantity</th>
+                        <th>Price (৳)</th>
+                        <th>Discount</th>
+                        <th>Total (৳)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $grand_total = 0;
+                    foreach ($products as $product) {
+                        $product_id = $product['product_id'];
+                        $quantity = $cart[$product_id];
+                        $price = $product['price'];
+                        $total = $price * $quantity;
+                        $discount = calculateDiscount($product, $discounts, $quantity);
+                        $discounted_total = $total;
 
-                    if (strpos($discount, '%') !== false) {
-                        $percentage = floatval(str_replace('-', '', str_replace('%', '', $discount)));
-                        $discounted_total = $total - ($total * ($percentage / 100));
-                    } elseif (strpos($discount, 'free') !== false) {
-                        $free_items = intval(str_replace('+', '', str_replace(' free', '', $discount)));
-                        $discounted_total = $price * ($quantity - $free_items);
+                        if (strpos($discount, '%') !== false) {
+                            $percentage = floatval(str_replace('-', '', str_replace('%', '', $discount)));
+                            $discounted_total = $total - ($total * ($percentage / 100));
+                        } elseif (strpos($discount, 'free') !== false) {
+                            $free_products = intval(str_replace('+', '', str_replace(' free', '', $discount)));
+                            $discounted_total -= $free_products * $price; // Deduct the value of free products from the total
+                        }
+
+                        $grand_total += $discounted_total;
+                        echo "<tr>
+                            <td>" . htmlspecialchars($product['name']) . "</td>
+                            <td>$quantity</td>
+                            <td>" . number_format($price, 2) . "</td>
+                            <td>$discount</td>
+                            <td>" . number_format($discounted_total, 2) . "</td>
+                        </tr>";
                     }
-
-                    $grand_total += $discounted_total;
-                    echo "<tr>
-                        <td>" . htmlspecialchars($product['name']) . "</td>
-                        <td>$quantity</td>
-                        <td>" . number_format($price, 2) . "</td>
-                        <td>$discount</td>
-                        <td>" . number_format($discounted_total, 2) . "</td>
-                    </tr>";
-                }
-                ?>
-                <tr>
-                    <td colspan="4" style="text-align: right;"><strong>Grand Total</strong></td>
-                    <td><strong><?php echo number_format($grand_total, 2); ?></strong></td>
-                </tr>
-            </tbody>
-        </table>
+                    ?>
+                    <tr>
+                        <td colspan="4" style="text-align: right;"><strong>Grand Total</strong></td>
+                        <td><strong><?php echo number_format($grand_total, 2); ?></strong></td>
+                    </tr>
+                    <tr>
+                        <td colspan="5" style="text-align: center;">
+                            <button type="submit" name="confirm_order">Confirm Order</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </form>
     <?php endif; ?>
 </body>
 </html>
