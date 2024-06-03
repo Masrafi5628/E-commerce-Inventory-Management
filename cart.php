@@ -1,6 +1,6 @@
 <?php
 session_start();
-include('config.php');
+include ('config.php');
 
 // Fetch discounts from the database
 $discount_sql = "SELECT * FROM Discounts WHERE start_date <= CURDATE() AND end_date >= CURDATE()";
@@ -31,7 +31,8 @@ if (count($cart) > 0) {
 }
 
 // Function to calculate the discount for a product
-function calculateDiscount($product, $discounts, $quantity, &$buy_offer, &$get_offer) {
+function calculateDiscount($product, $discounts, $quantity, &$buy_offer, &$get_offer)
+{
     $free_products = 0;
     $product_tags = explode(',', $product['tags']);
     foreach ($discounts as $discount) {
@@ -80,11 +81,18 @@ if (isset($_POST['confirm_order'])) {
     $order_sql = "INSERT INTO Orders (user_id, product_ids, quantities, prices, total_price, buy_offer, get_offer, free_products) VALUES ($user_id, '$product_ids', '$quantities', '" . implode(',', $prices) . "', $total_price, '" . implode(',', $buy_offers) . "', '" . implode(',', $get_offers) . "', '" . implode(',', $free_products) . "')";
     $conn->query($order_sql);
 
-    // Update stock quantities for purchased products
+    // Update stock quantities for purchased products and free products
     foreach ($cart as $product_id => $quantity) {
-        // Subtract purchased quantity from stock
         $update_sql = "UPDATE Products SET stock = stock - $quantity WHERE product_id = $product_id";
         $conn->query($update_sql);
+
+        // Handle free products from discounts
+        $product_discounts = calculateDiscount($products[$product_id], $discounts, $quantity, $buy_offer, $get_offer);
+        if (strpos($product_discounts, 'free') !== false) {
+            $free_products = intval(str_replace('+', '', str_replace(' free', '', $product_discounts)));
+            $update_sql = "UPDATE Products SET stock = stock - $free_products WHERE product_id = $product_id";
+            $conn->query($update_sql);
+        }
     }
 
     // Clear the cart after confirming the order
@@ -95,7 +103,8 @@ if (isset($_POST['confirm_order'])) {
 }
 
 // Function to calculate free products for a given product
-function calculateFreeProducts($product, $discounts, $quantity, &$buy_offer, &$get_offer) {
+function calculateFreeProducts($product, $discounts, $quantity, &$buy_offer, &$get_offer)
+{
     $free_products = 0;
     $product_tags = explode(',', $product['tags']);
     foreach ($discounts as $discount) {
@@ -136,58 +145,58 @@ $conn->close();
     <h2>Your Cart</h2>
     <a href="index.php">Continue Shopping</a>
     <?php if (empty($cart)): ?>
-        <p>Your cart is empty.</p>
+                <p>Your cart is empty.</p>
     <?php else: ?>
-        <form method="post">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Product Name</th>
-                        <th>Quantity</th>
-                        <th>Price (৳)</th>
-                        <th>Discount</th>
-                        <th>Total (৳)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    $grand_total = 0;
-                    foreach ($cart as $product_id => $quantity) {
-                        $product = $products[$product_id];
-                        $price = $product['price'];
-                        $total = $price * $quantity;
-                        $discount = calculateDiscount($product, $discounts, $quantity, $buy_offer, $get_offer);
-                        $discounted_total = $total;
+                <form method="post">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Product Name</th>
+                                <th>Quantity</th>
+                                <th>Price (৳)</th>
+                                <th>Discount</th>
+                                <th>Total (৳)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $grand_total = 0;
+                            foreach ($cart as $product_id => $quantity) {
+                                $product = $products[$product_id];
+                                $price = $product['price'];
+                                $total = $price * $quantity;
+                                $discount = calculateDiscount($product, $discounts, $quantity, $buy_offer, $get_offer);
+                                $discounted_total = $total;
 
-                        if (strpos($discount, '%') !== false) {
-                            $percentage = floatval(str_replace('-', '', str_replace('%', '', $discount)));
-                            $discounted_total = $total - ($total * ($percentage / 100));
-                        } elseif (strpos($discount, 'free') !== false) {
-                            $discounted_total = $total; // Subtract the value of free products from the total
-                        }
+                                if (strpos($discount, '%') !== false) {
+                                    $percentage = floatval(str_replace('-', '', str_replace('%', '', $discount)));
+                                    $discounted_total = $total - ($total * ($percentage / 100));
+                                } elseif (strpos($discount, 'free') !== false) {
+                                    $discounted_total = $total; // Subtract the value of free products from the total
+                                }
 
-                        $grand_total += $discounted_total;
-                        echo "<tr>
+                                $grand_total += $discounted_total;
+                                echo "<tr>
                             <td>" . htmlspecialchars($product['name']) . "</td>
                             <td>$quantity</td>
                             <td>" . number_format($price, 2) . "</td>
                             <td>$discount</td>
                             <td>" . number_format($discounted_total, 2) . "</td>
                         </tr>";
-                    }
-                    ?>
-                    <tr>
-                        <td colspan="4" style="text-align: right;"><strong>Grand Total</strong></td>
-                        <td><strong><?php echo number_format($grand_total, 2); ?></strong></td>
-                    </tr>
-                    <tr>
-                        <td colspan="5" style="text-align: center;">
-                            <button type="submit" name="confirm_order">Confirm Order</button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </form>
+                            }
+                            ?>
+                            <tr>
+                                <td colspan="4" style="text-align: right;"><strong>Grand Total</strong></td>
+                                <td><strong><?php echo number_format($grand_total, 2); ?></strong></td>
+                            </tr>
+                            <tr>
+                                <td colspan="5" style="text-align: center;">
+                                    <button type="submit" name="confirm_order">Confirm Order</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </form>
     <?php endif; ?>
 </body>
 </html>

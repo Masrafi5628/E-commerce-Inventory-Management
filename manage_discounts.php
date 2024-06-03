@@ -70,11 +70,81 @@ if ($result->num_rows > 0) {
 
 $conn->close();
 ?>
-
 <!DOCTYPE html>
 <html>
 <head>
     <title>Manage Discounts</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h2 {
+            color: #333;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+        input[type="date"] {
+            width: calc(100% - 18px);
+        }
+        #buy_quantity_field {
+            display: none;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .edit-btn, .delete-btn {
+            padding: 5px 10px;
+            margin-right: 5px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .edit-btn:hover, .delete-btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
     <script>
         function toggleBuyQuantityField() {
             var discountType = document.getElementById("discount_type").value;
@@ -119,7 +189,7 @@ $conn->close();
         <label for="discount_value">Discount Value:</label>
         <input type="number" id="discount_value" name="discount_value" step="0.01" required><br>
         
-        <div id="buy_quantity_field" style="display: none;">
+        <div id="buy_quantity_field">
             <label for="buy_quantity">Buy Quantity (for "Buy N Get M"):</label>
             <input type="number" id="buy_quantity" name="buy_quantity"><br>
         </div>
@@ -129,10 +199,10 @@ $conn->close();
 
         <label for="start_date">Start Date:</label>
         <input type="date" id="start_date" name="start_date" required><br>
-        
+        <br>
         <label for="end_date">End Date:</label>
         <input type="date" id="end_date" name="end_date" required><br>
-        
+        <br>
         <button type="submit">Save Discount</button>
     </form>
     <a href="index.php">Admin Panel</a>
@@ -160,8 +230,8 @@ $conn->close();
                 <td><?php echo htmlspecialchars($discount['start_date']); ?></td>
                 <td><?php echo htmlspecialchars($discount['end_date']); ?></td>
                 <td>
-                    <button onclick='editDiscount(<?php echo json_encode($discount); ?>)'>Edit</button>
-                    <a href="?delete_id=<?php echo $discount['discount_id']; ?>" onclick="return confirm('Are you sure you want to delete this discount?')">Delete</a>
+                    <button class="edit-btn" onclick='editDiscount(<?php echo json_encode($discount); ?>)'>Edit</button>
+                    <a class="delete-btn" href="?delete_id=<?php echo $discount['discount_id']; ?>" onclick="return confirm('Are you sure you want to delete this discount?')">Delete</a>
                 </td>
             </tr>
         <?php endforeach; ?>
