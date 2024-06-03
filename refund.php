@@ -33,11 +33,14 @@ $get_offer = explode(',', $order['get_offer']);
 
 // Find the index of the product in the order
 $product_index = array_search($product_id, $product_ids);
+echo "Product Index : $product_index\n"; // Debugging
 
 if ($product_index !== false) {
     $quantity = intval($quantities[$product_index]);
     $free_quantity = intval($free_products[$product_index]);
-    
+    $old_free_quantity = $free_quantity; // Assign old free quantity
+    echo "Old Free Quantity: $old_free_quantity "; // Debugging
+    echo $free_quantity;
     if ($refund_quantity > $quantity) {
         echo "Refund quantity exceeds purchased quantity"; // Debugging statement
         exit();
@@ -60,11 +63,11 @@ if ($product_index !== false) {
         $buy_quantity = intval($buy_offer[$product_index]);
         $get_quantity = intval($get_offer[$product_index]);
         
-        $old_free_quantity = $free_quantity; // original free quantity before refund
+        // $old_free_quantity = $free_quantity; // original free quantity before refund
 
         // Calculate new free products based on the new quantity after refund
         $new_free_quantity = floor($new_quantity / $buy_quantity) * $get_quantity;
-        
+        echo "Old Free Quantity: $old_free_quantity, New Free Quantity: $new_free_quantity";
         // Add the returned free products back to the inventory
         $returned_free_quantity = $old_free_quantity - $new_free_quantity;
         if ($returned_free_quantity > 0) {
@@ -109,7 +112,7 @@ if ($product_index !== false) {
 }
 
 // Redirect back to order details page
-header("Location: order_details.php?order_id=$order_id");
+// header("Location: order_details.php?order_id=$order_id");
 exit();
 
 $conn->close();

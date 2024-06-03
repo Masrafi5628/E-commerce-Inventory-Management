@@ -63,16 +63,21 @@ if (isset($_POST['confirm_order'])) {
     $prices = [];
     $buy_offers = [];
     $get_offers = [];
+    $free_products = []; // Array to store free products for each purchased product
     foreach ($cart as $product_id => $quantity) {
         $product = $products[$product_id];
         $prices[] = $product['price'];
         $offer = calculateDiscount($product, $discounts, $quantity, $buy_offer, $get_offer);
         $buy_offers[] = $buy_offer;
         $get_offers[] = $get_offer;
+
+        // Calculate free products for each purchased product
+        $free_products[] = calculateFreeProducts($product, $discounts, $quantity, $buy_offer, $get_offer);
     }
     $total_price = array_sum($prices);
 
-    $order_sql = "INSERT INTO Orders (user_id, product_ids, quantities, prices, total_price, buy_offer, get_offer) VALUES ($user_id, '$product_ids', '$quantities', '" . implode(',', $prices) . "', $total_price, '" . implode(',', $buy_offers) . "', '" . implode(',', $get_offers) . "')";
+    // Insert order details into the Orders table
+    $order_sql = "INSERT INTO Orders (user_id, product_ids, quantities, prices, total_price, buy_offer, get_offer, free_products) VALUES ($user_id, '$product_ids', '$quantities', '" . implode(',', $prices) . "', $total_price, '" . implode(',', $buy_offers) . "', '" . implode(',', $get_offers) . "', '" . implode(',', $free_products) . "')";
     $conn->query($order_sql);
 
     // Update stock quantities for purchased products
@@ -80,14 +85,6 @@ if (isset($_POST['confirm_order'])) {
         // Subtract purchased quantity from stock
         $update_sql = "UPDATE Products SET stock = stock - $quantity WHERE product_id = $product_id";
         $conn->query($update_sql);
-
-        // Handle free products from discounts
-        $product_discounts = calculateDiscount($products[$product_id], $discounts, $quantity, $buy_offer, $get_offer);
-        if (strpos($product_discounts, 'free') !== false) {
-            $free_products = intval(str_replace('+', '', str_replace(' free', '', $product_discounts)));
-            $update_sql = "UPDATE Products SET stock = stock - $free_products WHERE product_id = $product_id";
-            $conn->query($update_sql);
-        }
     }
 
     // Clear the cart after confirming the order
@@ -95,6 +92,22 @@ if (isset($_POST['confirm_order'])) {
     // Redirect to a thank you page or order history
     header('Location: index.php');
     exit();
+}
+
+// Function to calculate free products for a given product
+function calculateFreeProducts($product, $discounts, $quantity, &$buy_offer, &$get_offer) {
+    $free_products = 0;
+    $product_tags = explode(',', $product['tags']);
+    foreach ($discounts as $discount) {
+        $discount_tags = explode(',', $discount['tags']);
+        if (array_intersect($product_tags, $discount_tags)) {
+            if ($discount['discount_type'] == 'buy_n_get_m' && $quantity >= $discount['buy_quantity']) {
+                $free_products = floor($quantity / $discount['buy_quantity']) * $discount['discount_value'];
+                return $free_products;
+            }
+        }
+    }
+    return 0; // If no free products applicable
 }
 
 $conn->close();
