@@ -112,7 +112,7 @@ if ($product_index !== false) {
 }
 
 // Redirect back to order details page
-// header("Location: order_details.php?order_id=$order_id");
+header("Location: order_details.php?order_id=$order_id");
 exit();
 
 $conn->close();
