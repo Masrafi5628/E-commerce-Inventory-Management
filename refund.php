@@ -28,6 +28,8 @@ $product_ids = explode(',', $order['product_ids']);
 $quantities = explode(',', $order['quantities']);
 $prices = explode(',', $order['prices']);
 $free_products = explode(',', $order['free_products']);
+$buy_offer = explode(',', $order['buy_offer']);
+$get_offer = explode(',', $order['get_offer']);
 
 // Find the index of the product in the order
 $product_index = array_search($product_id, $product_ids);
@@ -51,7 +53,29 @@ if ($product_index !== false) {
 
     // Calculate new quantities after refund
     $new_quantity = $quantity - $refund_quantity;
-    $new_free_quantity = floor($new_quantity / $quantity) * $free_quantity; // Adjust free items proportionally
+
+    // Handle buy_n_get_m offer
+    $new_free_quantity = 0;
+    if ($buy_offer[$product_index] != 'null' && $get_offer[$product_index] != 'null') {
+        $buy_quantity = intval($buy_offer[$product_index]);
+        $get_quantity = intval($get_offer[$product_index]);
+        
+        $old_free_quantity = $free_quantity; // original free quantity before refund
+
+        // Calculate new free products based on the new quantity after refund
+        $new_free_quantity = floor($new_quantity / $buy_quantity) * $get_quantity;
+        
+        // Add the returned free products back to the inventory
+        $returned_free_quantity = $old_free_quantity - $new_free_quantity;
+        if ($returned_free_quantity > 0) {
+            $update_sql = "UPDATE Products SET stock = stock + $returned_free_quantity WHERE product_id = $product_id";
+            if ($conn->query($update_sql) === TRUE) {
+                echo "Stock updated for returned free products of product ID: $product_id"; // Debugging statement
+            } else {
+                echo "Error updating stock for free products: " . $conn->error; // Debugging statement
+            }
+        }
+    }
 
     $quantities[$product_index] = $new_quantity;
     $free_products[$product_index] = $new_free_quantity;
@@ -62,6 +86,8 @@ if ($product_index !== false) {
         unset($quantities[$product_index]);
         unset($prices[$product_index]);
         unset($free_products[$product_index]);
+        unset($buy_offer[$product_index]);
+        unset($get_offer[$product_index]);
     }
 
     // Update the order in the database
@@ -69,7 +95,9 @@ if ($product_index !== false) {
         product_ids = '" . implode(',', $product_ids) . "', 
         quantities = '" . implode(',', $quantities) . "', 
         prices = '" . implode(',', $prices) . "', 
-        free_products = '" . implode(',', $free_products) . "' 
+        free_products = '" . implode(',', $free_products) . "',
+        buy_offer = '" . implode(',', $buy_offer) . "',
+        get_offer = '" . implode(',', $get_offer) . "'
         WHERE order_id = $order_id";
     if ($conn->query($update_order_sql) === TRUE) {
         echo "Order updated successfully"; // Debugging statement

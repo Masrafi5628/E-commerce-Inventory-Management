@@ -25,26 +25,32 @@ if (count($cart) > 0) {
 
     if ($product_result->num_rows > 0) {
         while ($row = $product_result->fetch_assoc()) {
-            $products[$row['product_id']] = $row; // Store product details by product_id for easy access
+            $products[$row['product_id']] = $row;
         }
     }
 }
 
 // Function to calculate the discount for a product
-function calculateDiscount($product, $discounts, $quantity, &$free_products)
-{
+function calculateDiscount($product, $discounts, $quantity, &$buy_offer, &$get_offer) {
+    $free_products = 0;
     $product_tags = explode(',', $product['tags']);
     foreach ($discounts as $discount) {
         $discount_tags = explode(',', $discount['tags']);
         if (array_intersect($product_tags, $discount_tags)) {
             if ($discount['discount_type'] == 'percentage') {
+                $buy_offer = 'null';
+                $get_offer = $discount['discount_value'] . '%';
                 return '-' . $discount['discount_value'] . '%';
             } elseif ($discount['discount_type'] == 'buy_n_get_m' && $quantity >= $discount['buy_quantity']) {
                 $free_products = floor($quantity / $discount['buy_quantity']) * $discount['discount_value'];
+                $buy_offer = $discount['buy_quantity'];
+                $get_offer = $discount['discount_value'];
                 return '+' . $free_products . ' free';
             }
         }
     }
+    $buy_offer = 'null';
+    $get_offer = 'null';
     return '';
 }
 
@@ -55,19 +61,18 @@ if (isset($_POST['confirm_order'])) {
     $product_ids = implode(',', array_keys($cart));
     $quantities = implode(',', $cart);
     $prices = [];
-    $free_products_array = [];
-
+    $buy_offers = [];
+    $get_offers = [];
     foreach ($cart as $product_id => $quantity) {
         $product = $products[$product_id];
         $prices[] = $product['price'];
-        $free_products = 0;
-        calculateDiscount($product, $discounts, $quantity, $free_products);
-        $free_products_array[] = $free_products;
+        $offer = calculateDiscount($product, $discounts, $quantity, $buy_offer, $get_offer);
+        $buy_offers[] = $buy_offer;
+        $get_offers[] = $get_offer;
     }
     $total_price = array_sum($prices);
-    $free_products_string = implode(',', $free_products_array);
 
-    $order_sql = "INSERT INTO Orders (user_id, product_ids, quantities, prices, total_price, free_products) VALUES ($user_id, '$product_ids', '$quantities', '" . implode(',', $prices) . "', $total_price, '$free_products_string')";
+    $order_sql = "INSERT INTO Orders (user_id, product_ids, quantities, prices, total_price, buy_offer, get_offer) VALUES ($user_id, '$product_ids', '$quantities', '" . implode(',', $prices) . "', $total_price, '" . implode(',', $buy_offers) . "', '" . implode(',', $get_offers) . "')";
     $conn->query($order_sql);
 
     // Update stock quantities for purchased products
@@ -77,9 +82,9 @@ if (isset($_POST['confirm_order'])) {
         $conn->query($update_sql);
 
         // Handle free products from discounts
-        $free_products = 0;
-        calculateDiscount($products[$product_id], $discounts, $quantity, $free_products);
-        if ($free_products > 0) {
+        $product_discounts = calculateDiscount($products[$product_id], $discounts, $quantity, $buy_offer, $get_offer);
+        if (strpos($product_discounts, 'free') !== false) {
+            $free_products = intval(str_replace('+', '', str_replace(' free', '', $product_discounts)));
             $update_sql = "UPDATE Products SET stock = stock - $free_products WHERE product_id = $product_id";
             $conn->query($update_sql);
         }
@@ -138,8 +143,7 @@ $conn->close();
                         $product = $products[$product_id];
                         $price = $product['price'];
                         $total = $price * $quantity;
-                        $free_products = 0;
-                        $discount = calculateDiscount($product, $discounts, $quantity, $free_products);
+                        $discount = calculateDiscount($product, $discounts, $quantity, $buy_offer, $get_offer);
                         $discounted_total = $total;
 
                         if (strpos($discount, '%') !== false) {
@@ -158,7 +162,6 @@ $conn->close();
                             <td>" . number_format($discounted_total, 2) . "</td>
                         </tr>";
                     }
-                    
                     ?>
                     <tr>
                         <td colspan="4" style="text-align: right;"><strong>Grand Total</strong></td>
