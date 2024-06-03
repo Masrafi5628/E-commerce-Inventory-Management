@@ -18,7 +18,7 @@ $order_result = $conn->query($order_sql);
 if ($order_result->num_rows > 0) {
     $order = $order_result->fetch_assoc();
 } else {
-    echo "Invalid order ID.";
+    echo "Invalid order ID: $order_id"; // Debugging statement
     exit();
 }
 
@@ -37,10 +37,10 @@ for ($i = 0; $i < count($product_ids); $i++) {
             'price' => $prices[$i],
             'free_quantity' => $free_products[$i]
         ]);
+    } else {
+        echo "Product not found for ID: " . $product_ids[$i]; // Debugging statement
     }
 }
-
-$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -88,6 +88,7 @@ $conn->close();
                         <form method="post" action="refund.php">
                             <input type="hidden" name="order_id" value="<?php echo $order_id; ?>">
                             <input type="hidden" name="product_id" value="<?php echo $product['product_id']; ?>">
+                            <input type="number" name="refund_quantity" min="1" max="<?php echo $product['quantity']; ?>" value="1">
                             <button type="submit" name="refund">Refund</button>
                         </form>
                     </td>

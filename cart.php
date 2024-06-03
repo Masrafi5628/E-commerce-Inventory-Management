@@ -158,6 +158,7 @@ $conn->close();
                             <td>" . number_format($discounted_total, 2) . "</td>
                         </tr>";
                     }
+                    
                     ?>
                     <tr>
                         <td colspan="4" style="text-align: right;"><strong>Grand Total</strong></td>

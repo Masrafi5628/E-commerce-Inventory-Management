@@ -19,9 +19,10 @@ if ($order_result->num_rows > 0) {
     while ($row = $order_result->fetch_assoc()) {
         $orders[] = $row;
     }
+} else {
+    echo "No orders found for user ID: $user_id"; // Debugging statement
 }
 
-$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -70,6 +71,8 @@ $conn->close();
                         if ($product_result->num_rows > 0) {
                             $product_row = $product_result->fetch_assoc();
                             $product_names[] = $product_row['name'];
+                        } else {
+                            $product_names[] = "Unknown Product (ID: $product_id)"; // Debugging statement
                         }
                     }
                     ?>
